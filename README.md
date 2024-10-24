@@ -8,6 +8,8 @@
 
 This AWS Glue job processes multiple tables from a PostgreSQL database connected via JDBC. It supports **Change Data Capture (CDC)** using the `updated_at` column and logs the processing results. The logs are stored in memory during job execution and are uploaded to an S3 bucket after completion.
 
+![App Screenshot](images/Logs2.png)
+
 The script processes tables in batches to avoid memory overflow issues. It tracks the maximum `updated_at` timestamp for each table and stores this information in a CSV file in S3, enabling efficient CDC in subsequent runs by processing only updated rows.
 
 ## Key Features
@@ -38,6 +40,8 @@ The Glue job accepts the following parameters:
 - `log_folder_path`: The S3 path where logs will be uploaded after job completion.
 - `load_type`: Defines whether the job is running in **full load** (`full`) mode or **CDC** (`cdc`) mode.
 
+![App Screenshot](images/Parameters.png)
+
 ## Script Flow
 
 1. **Retrieve Table Names**: The script fetches the list of tables from the specified database in the Glue Data Catalog.
@@ -58,6 +62,8 @@ The Glue job accepts the following parameters:
 - For each table, the script reads the maximum `updated_at` timestamp from a CSV file stored in S3.
 - If this is the first run for the table, it processes all records (full load). In subsequent runs, only rows with an `updated_at` greater than the previously recorded timestamp are processed.
 
+![App Screenshot](images/CDC.png)
+
 ### 3. Process Tables in Batches
 - Tables are processed in batches to avoid memory overflows.
 
@@ -70,6 +76,7 @@ The Glue job accepts the following parameters:
 ### 6. Log Upload
 - In-memory logs are uploaded to S3 after the job completes.
 
+
 # Script Breakdown
 
 ### 1. Initialize AWS Glue Context and Job
@@ -81,7 +88,7 @@ The Glue job accepts the following parameters:
 ### 1. Retrieve Table Names
 - The script fetches the list of tables from the specified database in the Glue Data Catalog.
 
-!![App Screenshot](images/Args1.png)
+![App Screenshot](images/Args1.png)
 
 
 ### 2. CDC Timestamp Tracking
