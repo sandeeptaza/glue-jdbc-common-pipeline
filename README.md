@@ -49,6 +49,58 @@ The Glue job accepts the following parameters:
 5. **Update CDC Tracking**: After processing each table, the maximum `updated_at` timestamp is updated in the CSV file in S3.
 6. **Log Upload**: In-memory logs are uploaded to S3 after the job completes.
 
+# Script Flow
+
+### 1. Retrieve Table Names
+- The script fetches the list of tables from the specified database in the Glue Data Catalog.
+
+### 2. CDC Timestamp Tracking
+- For each table, the script reads the maximum `updated_at` timestamp from a CSV file stored in S3.
+- If this is the first run for the table, it processes all records (full load). In subsequent runs, only rows with an `updated_at` greater than the previously recorded timestamp are processed.
+
+### 3. Process Tables in Batches
+- Tables are processed in batches to avoid memory overflows.
+
+### 4. Store Processed Data
+- The data is written to S3 in Parquet format, partitioned by the `updated_at` date.
+
+### 5. Update CDC Tracking
+- After processing each table, the maximum `updated_at` timestamp is updated in the CSV file in S3.
+
+### 6. Log Upload
+- In-memory logs are uploaded to S3 after the job completes.
+
+# Script Breakdown
+
+### 1. Initialize AWS Glue Context and Job
+- The script initializes the Glue context, Spark context, and job.
+
+
+# Script Flow
+
+### 1. Retrieve Table Names
+- The script fetches the list of tables from the specified database in the Glue Data Catalog.
+
+### 2. CDC Timestamp Tracking
+- For each table, the script reads the maximum `updated_at` timestamp from a CSV file stored in S3.
+- If this is the first run for the table, it processes all records (full load). In subsequent runs, only rows with an `updated_at` greater than the previously recorded timestamp are processed.
+
+### 3. Process Tables in Batches
+- Tables are processed in batches to avoid memory overflows.
+
+### 4. Store Processed Data
+- The data is written to S3 in Parquet format, partitioned by the `updated_at` date.
+
+### 5. Update CDC Tracking
+- After processing each table, the maximum `updated_at` timestamp is updated in the CSV file in S3.
+
+### 6. Log Upload
+- In-memory logs are uploaded to S3 after the job completes.
+
+# Script Breakdown
+
+### 1. Initialize AWS Glue Context and Job
+- The script initializes the Glue context, Spark context, and job.
 
 
 ## Usage Instructions
