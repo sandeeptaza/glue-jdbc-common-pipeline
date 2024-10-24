@@ -8,8 +8,6 @@
 
 This AWS Glue job processes multiple tables from a PostgreSQL database connected via JDBC. It supports **Change Data Capture (CDC)** using the `updated_at` column and logs the processing results. The logs are stored in memory during job execution and are uploaded to an S3 bucket after completion.
 
-![App Screenshot](images/Logs2.png)
-
 The script processes tables in batches to avoid memory overflow issues. It tracks the maximum `updated_at` timestamp for each table and stores this information in a CSV file in S3, enabling efficient CDC in subsequent runs by processing only updated rows.
 
 ## Key Features
