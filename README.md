@@ -81,7 +81,8 @@ The Glue job accepts the following parameters:
 ### 1. Retrieve Table Names
 - The script fetches the list of tables from the specified database in the Glue Data Catalog.
 
-!images/Args1.png
+!glue-jdbc-common-pipeline/images/Args1.png
+
 
 ### 2. CDC Timestamp Tracking
 - For each table, the script reads the maximum `updated_at` timestamp from a CSV file stored in S3.
