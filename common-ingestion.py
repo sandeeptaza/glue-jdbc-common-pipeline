@@ -4,6 +4,9 @@
 #              handles Change Data Capture (CDC) with the 'updated_at' column, and log the 
 #              processing results. Logs are handled in memory and uploaded to S3 after job completion if required.
 
+#Change Log 
+
+#28 Oct 2024 : Added Duplicate Logic and handel tables in batch for large tables in DB
 import sys
 import boto3
 import csv
@@ -122,6 +125,9 @@ def process_table(glueContext, table_name, database_name, output_path):
 
         if args['load_type'] == 'cdc' and max_timestamp:
             df = df.filter(col('updated_at') > max_timestamp)
+
+        # Drop duplicates based on primary key and updated_at columns
+        df = df.dropDuplicates(['id', 'updated_at'])
 
         df = df.withColumn("partition_date", date_format(col("updated_at"), "yyyy-MM-dd"))
         dynamic_frame_filtered = DynamicFrame.fromDF(df, glueContext, f"{table_name}_filtered")
