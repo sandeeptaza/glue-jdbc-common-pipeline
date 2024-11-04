@@ -1,106 +1,111 @@
-# AWS Glue Job: CDC with PostgreSQL via JDBC
+# AWS Glue Job Script Documentation
 
-## Author: Sandeep R Diddi
-
-**Date**: 2024-10-24
+This document provides an overview and explanation of a Python script used to perform data ingestion from AWS Glue tables, handle change data capture (CDC), and save processed data to Amazon S3 in Parquet format. The script is designed to support both full and incremental (CDC) loads using `updated_at` timestamps. It leverages AWS Glue, PySpark, and Boto3 for data management and transformations.
 
 ## Overview
 
-This AWS Glue job processes multiple tables from a PostgreSQL database connected via JDBC. It supports **Change Data Capture (CDC)** using the `updated_at` column and logs the processing results. The logs are stored in memory during job execution and uploaded to an S3 bucket after completion.
+The script performs the following key tasks:
 
-The script processes tables in batches to avoid memory overflow issues. It tracks the maximum `updated_at` timestamp for each table and stores this information in a CSV file in S3, enabling efficient CDC in subsequent runs by processing only updated rows.
+1. Sets up a logging framework to capture runtime information and issues.
+2. Initializes the Glue context and Spark session for processing.
+3. Retrieves necessary parameters to specify Athena database details, output paths, and other configurations.
+4. Defines helper functions for managing primary keys, tracking CDC, and fetching metadata from S3.
+5. Iterates over all tables in the specified Athena database to perform data ingestion, deduplication, and CDC management.
+6. Saves the processed data to Amazon S3 in Parquet format and updates CDC tracker files for future incremental loads.
 
-## Key Features
+## Detailed Explanation
 
-- **PostgreSQL via JDBC**: Connects to a PostgreSQL database and processes tables using AWS Glue's dynamic frame API.
-- **CDC Logic**: Uses the `updated_at` column to capture changes, processing only new or updated records in subsequent runs.
-- **Duplicate Handling**: Removes duplicate records based on primary key and `updated_at` columns, ensuring unique entries in the output.
-- **In-memory Logging**: Logs are stored in memory during job execution and uploaded to S3 at the end.
-- **Batch Processing**: Tables are processed in batches to avoid memory issues and ensure efficient execution.
-- **S3 Integration**: Reads from and writes to S3, including logging and tracking CDC timestamps.
+### Imports and Setup
 
-## Requirements
+The script begins by importing essential libraries and modules:
 
-1. **AWS Glue**: This job is written for the AWS Glue environment.
-2. **S3 Buckets**: You will need S3 buckets for:
-   - Storing CDC timestamp CSV (`max_timestamps.csv`).
-   - Storing logs after job completion.
-3. **PostgreSQL Database**: Assumes a PostgreSQL database that has been crawled into the Glue Data Catalog.
+- **`sys`**: For handling system arguments.
+- **`logging`**: To configure and capture logs.
+- **`boto3`**: For AWS SDK to interact with AWS services.
+- **`pandas`** and **`StringIO`**: For handling data transformations in memory.
+- **`pyspark`** and **`awsglue`**: To interact with Spark and Glue for data processing.
+- **`datetime`**: For handling date and time formatting.
 
-## Parameters
+These libraries allow the script to interact with S3, Glue, and other AWS services while managing data transformations and timestamp tracking.
 
-The Glue job accepts the following parameters:
+### Logging Configuration
 
-- `JOB_NAME`: The name of the Glue job.
-- `database_name`: The name of the database in the Glue Data Catalog to process.
-- `s3_output_path`: The S3 path where the processed data will be stored.
-- `environment`: The environment label (e.g., `dev`, `prod`).
-- `csv_file_name`: The S3 location of the `max_timestamps.csv` file used for CDC.
-- `log_folder_path`: The S3 path where logs will be uploaded after job completion.
-- `load_type`: Defines whether the job is running in **full load** (`full`) mode or **CDC** (`cdc`) mode.
+The script configures logging to capture messages at the INFO level, with timestamps and log levels included in each message. This setup ensures that the script provides detailed information on each operation, aiding in debugging and monitoring.
 
-![App Screenshot](images/Parameters.png)
+### Glue and Spark Context Initialization
 
-## Script Flow
+The script initializes the Glue context and Spark session:
 
-1. **Retrieve Table Names**: The script fetches the list of tables from the specified database in the Glue Data Catalog.
-2. **CDC Timestamp Tracking**:
-   - Reads the maximum `updated_at` timestamp from a CSV file stored in S3.
-   - If this is the first run for the table, it processes all records (full load). In subsequent runs, only rows with an `updated_at` greater than the previously recorded timestamp are processed.
-3. **Duplicate Handling**:
-   - After loading each table, removes duplicate records based on a combination of primary key and `updated_at` columns. This ensures only unique records are stored in S3.
-4. **Process Tables in Batches**: Processes tables in batches to avoid memory overflows.
-5. **Store Processed Data**: Writes the data to S3 in Parquet format, partitioned by the `updated_at` date.
-6. **Update CDC Tracking**: Updates the maximum `updated_at` timestamp in the CSV file in S3.
-7. **Log Upload**: Uploads in-memory logs to S3 after job completion.
+- **Glue Context**: Enables interaction with AWS Glue to read and process data from Glue tables.
+- **Spark Session**: Allows PySpark to perform distributed data processing.
+- **Glue Job**: Manages the lifecycle of the Glue job, including committing the job status at the end.
 
-## Script Flow Details
+This setup prepares the environment for running transformations on data from Glue tables.
 
-### 1. Retrieve Table Names
-- Fetches the list of tables from the specified database in the Glue Data Catalog.
+### Parameter and Argument Retrieval
 
-### 2. CDC Timestamp Tracking
-- Reads the maximum `updated_at` timestamp from a CSV file stored in S3.
-- If this is the first run for the table, processes all records (full load). In subsequent runs, processes only rows with an `updated_at` greater than the previously recorded timestamp.
+The script retrieves job parameters provided at runtime, which include:
 
-![App Screenshot](images/CDC.png)
+- **`JOB_NAME`**: The name of the Glue job.
+- **`athena_database_name`**: The Athena (Glue) database name containing the tables.
+- **`output_path`**: The S3 path where processed data will be saved.
+- **`cdc_path`**: S3 path for storing CDC tracker files.
+- **`load_type`**: Indicates whether to perform a full or incremental load.
+- **`primary_key_s3_prefix`**: S3 path prefix to locate primary key information files.
 
-### 3. Duplicate Handling
-- Uses `dropDuplicates(['id', 'updated_at'])` to remove duplicate records based on the `id` and `updated_at` columns, ensuring unique records in the output.
+These parameters define the data sources, destinations, and configuration options for the Glue job.
 
-### 4. Process Tables in Batches
-- Processes tables in batches to avoid memory overflows.
+### Helper Functions
 
-### 5. Store Processed Data
-- Writes data to S3 in Parquet format, partitioned by `updated_at` date.
+The script defines several helper functions to simplify operations:
 
-### 6. Update CDC Tracking
-- Updates the maximum `updated_at` timestamp in the CSV file in S3 after processing each table.
+1. **Fetch Latest Primary Key CSV from S3**: This function retrieves the latest primary key file from the specified S3 path and loads it as a DataFrame. This file is used to determine the primary key for deduplication.
 
-### 7. Log Upload
-- Uploads in-memory logs to S3 after the job completes.
+2. **Get Primary Key for a Table**: Given a table name, this function fetches the corresponding primary key from the DataFrame containing primary key data. If no primary key is found, a warning is logged, and deduplication is skipped.
 
-## Script Breakdown
+3. **Get CDC Tracker Path**: This function constructs the S3 path to the CDC tracker file for each table. The tracker file records the last processed timestamp for incremental loading.
 
-### 1. Initialize AWS Glue Context and Job
-- Initializes the Glue context, Spark context, and job.
+4. **Get Last Processed Timestamp**: This function retrieves the last processed timestamp from the CDC tracker file. If no tracker file exists, it defaults to a full load.
 
-### 2. CDC Logic and Duplicate Handling
-- In full load mode, processes all records; in CDC mode, only records with `updated_at` greater than the last `max_timestamp` in the CSV are processed.
-- `dropDuplicates()` ensures that any duplicate records, based on `id` and `updated_at`, are removed before writing to S3.
+5. **Update Last Processed Timestamp**: After processing each table, this function updates the CDC tracker file with the latest processed timestamp. This ensures that future runs will only process new or updated records.
 
-## Usage Instructions
+### Processing Each Table in the Database
 
-### 1. Setup AWS Glue Job
-- Create an AWS Glue Job in the Glue Console and upload this script.
-- **Configure the Job**:
-  - **Job type**: Spark
-  - **IAM Role**: Ensure it has the necessary permissions for Glue, S3, and PostgreSQL.
-  - **Number of DPUs**: Adjust based on your dataset size.
+The script iterates through all tables in the specified Athena database and performs the following steps for each table:
 
-### 2. Configure S3 Buckets
-- **S3 Output Path**: Set up an S3 path to store processed data in Parquet format.
-- **Log Folder**: Set up an S3 path where logs will be uploaded after the job completes.
-- **CDC Tracking CSV**: Create an S3 location for storing the `max_timestamps.csv` file.
+1. **List Tables**: Uses the Glue client to list all tables in the database, fetching metadata for each table.
+
+2. **Process Each Table**: For each table, the script performs data loading, deduplication, and CDC tracking:
+
+   - **Column Check**: Verifies that the `updated_at` column exists, as it is essential for CDC. If absent, the script logs a warning and skips CDC for that table.
+   - **Primary Key Check**: Retrieves the primary key for the table to perform deduplication. If no primary key is defined, deduplication is skipped.
+   - **Load Type**:
+     - **Full Load**: If `load_type` is "full" or no CDC tracker exists, the script loads all records and deduplicates them using the primary key.
+     - **Incremental Load (CDC)**: If a CDC tracker file exists, the script filters records based on the last processed timestamp and deduplicates the new records.
+   - **Data Writing**: Writes the deduplicated data to the specified S3 path in Parquet format.
+   - **CDC Tracker Update**: Updates the CDC tracker file with the latest `updated_at` timestamp, preparing for future incremental loads.
+
+### Job Commit
+
+At the end of the process, the script commits the Glue job, marking it as complete.
+
+## Error Handling
+
+The script incorporates error handling through log warnings and default behaviors:
+
+- If a primary key is missing, deduplication is skipped, and a warning is logged.
+- If a CDC tracker file is not found, the script defaults to a full load.
+
+These error-handling mechanisms help the script to handle various scenarios gracefully, ensuring reliable execution.
+
+## Sample Usage
+
+To execute this Glue job, provide the required parameters through the AWS Glue Console or CLI. Specify the necessary values for `athena_database_name`, `output_path`, `cdc_path`, `load_type`, and other parameters to configure the job correctly.
+
+## Logging and Debugging
+
+The script provides detailed logging for each operation, including table processing, deduplication, and CDC handling. This information can be invaluable for debugging and performance monitoring, as it allows users to trace the workflow step-by-step.
 
 ---
+
+This Glue job script automates the ingestion, CDC tracking, and deduplication of data from an Athena database, using S3 for CDC tracking and primary key management.
